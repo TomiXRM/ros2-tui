@@ -10,7 +10,11 @@ import threading
 from example_interfaces.action import Fibonacci
 
 from ros2_tui.form import flatten_fields
-from ros2_tui.ros import RosBridge, build_goal
+from ros2_tui.ros import RosBridge, build_message
+
+
+def build_goal(action_type, values):
+    return build_message(action_type.Goal, values)
 
 
 def test_flatten_fields():
@@ -68,7 +72,7 @@ def test_send_goal_roundtrip():
     spin.start()
 
     async def run(bridge: RosBridge):
-        client = bridge.client("smoke/fibonacci", "example_interfaces/action/Fibonacci")
+        client = bridge.action_client("smoke/fibonacci", "example_interfaces/action/Fibonacci")
         await asyncio.wait_for(client.wait_for_server(), 5)
         actions = dict(await asyncio.to_thread(bridge.list_actions))
         assert "/smoke/fibonacci" in actions

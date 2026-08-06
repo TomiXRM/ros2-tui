@@ -20,6 +20,7 @@ async def test_send_goal_via_ui():
     from textual.widgets import Input, ListView, RichLog
 
     from ros2_tui.app import Ros2TuiApp
+    from ros2_tui.panes import ActionPane
     from ros2_tui.ros import RosBridge
 
     class Srv(Node):
@@ -56,7 +57,7 @@ async def test_send_goal_via_ui():
                 names: list = []
                 for _ in range(20):  # wait for discovery + refresh tick
                     await asyncio.sleep(0.5)
-                    lv = app.query_one("#actions", ListView)
+                    lv = app.query_one(ActionPane).query_one(ListView)
                     names = [li.name for li in lv.children]
                     if "/ui_test/fibonacci" in names:
                         break
@@ -65,7 +66,7 @@ async def test_send_goal_via_ui():
                 lv.index = names.index("/ui_test/fibonacci")
                 lv.action_select_cursor()
                 await pilot.pause()
-                app.query_one("#field-order", Input).value = "6"
+                next(i for i in app.query_one(ActionPane).query(Input) if i.name == "order").value = "6"
                 await pilot.click("#send")
 
                 for _ in range(30):
