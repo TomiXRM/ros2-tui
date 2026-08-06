@@ -22,6 +22,24 @@ def _oneline(msg) -> str:
     return message_to_yaml(msg).replace("\n", " ").strip()
 
 
+PRETTY_MAX_LINES = 30
+PRETTY_MAX_CHARS = 200
+
+
+def _pretty(msg) -> str:
+    """Indented multi-line YAML, truncated so huge messages (images, maps)
+    don't drown the log."""
+    lines = message_to_yaml(msg).rstrip().splitlines()
+    if len(lines) > PRETTY_MAX_LINES:
+        hidden = len(lines) - PRETTY_MAX_LINES
+        lines = lines[:PRETTY_MAX_LINES] + [f"… (+{hidden} lines)"]
+    lines = [
+        line if len(line) <= PRETTY_MAX_CHARS else line[:PRETTY_MAX_CHARS] + " …"
+        for line in lines
+    ]
+    return "\n".join("  " + line for line in lines)
+
+
 class SafeListView(ListView):
     """Ignore clicks on items that were removed by a list rebuild in the
     instant between the click and its handler (auto-refresh race)."""
@@ -180,13 +198,13 @@ class ActionPane(ListDetailPane):
         self.log(f"{name}: [yellow]ACCEPTED[/yellow]")
         try:
             async for fb in gh.feedback_until_result():
-                self.log(f"feedback: {_oneline(fb)}")
+                self.log(f"feedback:\n{_pretty(fb)}")
             result = await gh.result
-            self.log(f"[green]SUCCEEDED[/green] result: {_oneline(result)}")
+            self.log(f"[green]SUCCEEDED[/green] result:\n{_pretty(result)}")
         except afor.ActionCanceled as e:
-            self.log(f"[magenta]CANCELED[/magenta] result: {_oneline(e.result)}")
+            self.log(f"[magenta]CANCELED[/magenta] result:\n{_pretty(e.result)}")
         except afor.ActionAborted as e:
-            self.log(f"[red]ABORTED[/red] result: {_oneline(e.result)}")
+            self.log(f"[red]ABORTED[/red] result:\n{_pretty(e.result)}")
         except afor.ActionResultUnknown:
             self.log(f"[red]{name}: result UNKNOWN (server lost the goal)[/red]")
         finally:
@@ -207,7 +225,7 @@ class ActionPane(ListDetailPane):
 
 class TopicPane(ListDetailPane):
     SNAPSHOT_KEY = "topics"
-    ECHO_DISPLAY_HZ = 10.0  # drop display (not data) above this rate
+    ECHO_DISPLAY_HZ = 2.0  # drop display (not data) above this rate
 
     def __init__(self, bridge: RosBridge, **kwargs) -> None:
         super().__init__(bridge, **kwargs)
@@ -260,7 +278,7 @@ class TopicPane(ListDetailPane):
                 if now - last < 1.0 / self.ECHO_DISPLAY_HZ:
                     continue
                 last = now
-                self.log(f"[dim]{name}[/dim] {_oneline(msg)}")
+                self.log(f"[dim]{name}[/dim]\n{_pretty(msg)}")
         finally:
             sub.close()
             self.log(f"[b]{name}[/b] echo stopped")
@@ -317,7 +335,7 @@ class ServicePane(ListDetailPane):
         except asyncio.TimeoutError:
             self.log(f"[red]{name}: no response in {SERVICE_TIMEOUT}s[/red]")
             return
-        self.log(f"[green]response:[/green] {_oneline(res)}")
+        self.log(f"[green]response:[/green]\n{_pretty(res)}")
 
 
 # ── Params ────────────────────────────────────────────────────────────────────
