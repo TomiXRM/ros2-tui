@@ -8,7 +8,7 @@ import asyncio_for_robotics.ros2 as afor
 from rosidl_runtime_py import message_to_yaml
 from rosidl_runtime_py.utilities import get_action, get_message, get_service
 from textual import on, work
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Input, Label, ListItem, ListView, RichLog
 
 from .form import flatten_fields
@@ -30,9 +30,12 @@ class ListDetailPane(Horizontal):
         self.bridge = bridge
         self._items: dict[str, object] = {}  # name -> payload (e.g. type string)
         self.selected: tuple[str, object] | None = None
+        self._filter = ""
 
     def compose(self):
-        yield ListView(classes="entity-list")
+        with Vertical(classes="entity-col"):
+            yield Input(placeholder="/ filter", classes="filter")
+            yield ListView(classes="entity-list")
         with VerticalScroll(classes="detail"):
             yield Label("Select an item", classes="detail-title")
 
@@ -60,13 +63,29 @@ class ListDetailPane(Horizontal):
         if items == self._items:
             return
         self._items = items
+        self._render_list()
+
+    def _render_list(self) -> None:
         lv = self.query_one(ListView)
         selected = self.selected[0] if self.selected else None
+        shown = [n for n in sorted(self._items) if self._filter in n]
         lv.clear()
-        for i, name in enumerate(sorted(items)):
+        for i, name in enumerate(shown):
             lv.append(ListItem(Label(name), name=name))
             if name == selected:
                 lv.index = i
+
+    @on(Input.Changed, ".filter")
+    def _on_filter_changed(self, event: Input.Changed) -> None:
+        self._filter = event.value.strip()
+        self._render_list()
+
+    @on(Input.Submitted, ".filter")
+    def _on_filter_submitted(self) -> None:
+        self.query_one(ListView).focus()
+
+    def focus_filter(self) -> None:
+        self.query_one(".filter", Input).focus()
 
     @on(ListView.Selected)
     async def _on_selected(self, event: ListView.Selected) -> None:

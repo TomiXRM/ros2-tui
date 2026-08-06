@@ -59,10 +59,12 @@ class Ros2TuiApp(App):
     TITLE = "ros2-tui"
 
     CSS = """
-    TabbedContent { height: 2fr; }
-    .entity-list { width: 1fr; border: solid $primary; }
-    .detail { width: 2fr; border: solid $primary; }
-    #log { height: 1fr; border: solid $secondary; }
+    TabbedContent { height: 1fr; }
+    .entity-col { width: 33%; }
+    .filter { height: 3; }
+    .entity-list { height: 1fr; border: solid $primary; }
+    .detail { width: 1fr; border: solid $primary; }
+    #log { height: 30%; border: solid $secondary; }
     .detail-title { padding: 0 1; }
     .field-row { height: 3; }
     .field-label { width: 24; padding: 1 1; text-align: right; }
@@ -74,13 +76,20 @@ class Ros2TuiApp(App):
 
     BINDINGS = [
         ("r", "refresh", "Refresh list"),
+        ("slash", "focus_filter", "Filter"),
         ("d", "set_domain", "Domain ID"),
+        ("left_square_bracket", "resize_list(-5)", "List narrower"),
+        ("right_square_bracket", "resize_list(5)", "List wider"),
+        ("left_curly_bracket", "resize_log(-5)", "Log shorter"),
+        ("right_curly_bracket", "resize_log(5)", "Log taller"),
         ("q", "quit", "Quit"),
     ]
 
     def __init__(self, bridge: RosBridge) -> None:
         super().__init__()
         self.bridge = bridge
+        self._list_width = 33  # percent
+        self._log_height = 30  # percent
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -111,9 +120,27 @@ class Ros2TuiApp(App):
         )
 
     def action_refresh(self) -> None:
-        active = self.query_one(TabbedContent).active_pane
+        active = self._active_list_pane()
         if active is not None:
-            active.query_one(ListDetailPane).refresh_list()
+            active.refresh_list()
+
+    def action_focus_filter(self) -> None:
+        active = self._active_list_pane()
+        if active is not None:
+            active.focus_filter()
+
+    def action_resize_list(self, delta: int) -> None:
+        self._list_width = max(15, min(70, self._list_width + delta))
+        for col in self.query(".entity-col"):
+            col.styles.width = f"{self._list_width}%"
+
+    def action_resize_log(self, delta: int) -> None:
+        self._log_height = max(10, min(60, self._log_height + delta))
+        self.query_one("#log", RichLog).styles.height = f"{self._log_height}%"
+
+    def _active_list_pane(self) -> ListDetailPane | None:
+        active = self.query_one(TabbedContent).active_pane
+        return active.query_one(ListDetailPane) if active is not None else None
 
     def action_set_domain(self) -> None:
         self.push_screen(DomainScreen(self.bridge.domain_id), self._on_domain_chosen)
