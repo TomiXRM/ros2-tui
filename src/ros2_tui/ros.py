@@ -11,6 +11,29 @@ from rosidl_runtime_py import set_message_fields
 from rosidl_runtime_py.utilities import get_action, get_message, get_service
 
 
+def create_session(domain_id: int | None = None):
+    """ThreadedSession on its own rclpy context so the domain can be chosen
+    (and changed later by building a fresh session)."""
+    import rclpy
+    from rclpy.executors import SingleThreadedExecutor
+    from asyncio_for_robotics.ros2.session_types import ThreadedSession
+
+    ctx = rclpy.Context()
+    rclpy.init(context=ctx, domain_id=domain_id)
+    node = rclpy.create_node("ros2_tui", context=ctx)
+    session = ThreadedSession(node, SingleThreadedExecutor(context=ctx))
+    session.start()
+    session._ros2_tui_ctx = ctx  # keep the context alive / findable
+    return session
+
+
+def close_session(session) -> None:
+    ctx = getattr(session, "_ros2_tui_ctx", None)
+    session.close()
+    if ctx is not None:
+        ctx.try_shutdown()
+
+
 def _is_hidden(name: str) -> bool:
     """Hidden ROS names (same rule ros2cli uses): any token starting with '_',
     e.g. /fibonacci/_action/send_goal."""
@@ -23,6 +46,33 @@ class RosBridge:
         self._action_clients: dict[tuple[str, str], afor.ActionClient] = {}
         self._service_clients: dict[tuple[str, str], afor.Client] = {}
         self._publishers: dict[tuple[str, str], object] = {}
+
+    # ── environment info / domain switching ───────────────────────────────────
+
+    @property
+    def domain_id(self) -> int:
+        with self.session.lock() as node:
+            return node.context.get_domain_id()
+
+    @staticmethod
+    def rmw() -> str:
+        from rclpy.utilities import get_rmw_implementation_identifier
+
+        return get_rmw_implementation_identifier()
+
+    def restart(self, domain_id: int) -> None:
+        """Tear down the session and reconnect on another ROS domain.
+        Blocking; call from a worker thread. In-flight goals are dropped."""
+        for client in [*self._action_clients.values(), *self._service_clients.values()]:
+            try:
+                client.close()
+            except Exception:
+                pass
+        self._action_clients.clear()
+        self._service_clients.clear()
+        self._publishers.clear()
+        close_session(self.session)
+        self.session = create_session(domain_id)
 
     # ── graph queries (blocking; call from a worker thread) ───────────────────
 

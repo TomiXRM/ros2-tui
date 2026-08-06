@@ -73,3 +73,17 @@ def test_param_roundtrip_and_publish():
             asyncio.run(run(RosBridge(ses)))
     finally:
         ex.shutdown(timeout_sec=2)
+
+
+def test_domain_switch():
+    from ros2_tui.ros import RosBridge, close_session, create_session
+
+    session = create_session(7)
+    bridge = RosBridge(session)
+    try:
+        assert bridge.domain_id == 7
+        bridge.restart(9)
+        assert bridge.domain_id == 9
+        assert isinstance(bridge.list_nodes(), list)
+    finally:
+        close_session(bridge.session)
