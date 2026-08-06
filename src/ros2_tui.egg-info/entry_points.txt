@@ -1,2 +1,0 @@
-[console_scripts]
-ros2-tui = ros2_tui.__main__:main

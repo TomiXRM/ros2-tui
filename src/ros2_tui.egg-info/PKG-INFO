@@ -1,5 +1,0 @@
-Metadata-Version: 2.4
-Name: ros2-tui
-Version: 0.1.0
-Summary: TUI client for ROS 2 actions: form-based send_goal with live feedback
-Requires-Python: >=3.11
