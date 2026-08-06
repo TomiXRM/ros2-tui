@@ -16,6 +16,22 @@ cd ros2-tui
 pixi install --locked
 ```
 
+### グローバルコマンドにする(`uv tool install -e .` 相当)
+
+pixi の workspace 登録 + シムで、どのディレクトリからでも `ros2-tui` で起動できます:
+
+```sh
+pixi workspace register            # リポジトリ内で一度だけ
+cat > ~/.local/bin/ros2-tui <<'EOF'
+#!/bin/sh
+exec pixi run -q -w ros2-tui ros2-tui "$@"
+EOF
+chmod +x ~/.local/bin/ros2-tui
+```
+
+env にはこのリポジトリが editable で入っているので、コードを編集すれば
+そのまま反映されます(`-e` と同じ挙動)。
+
 ## 使い方
 
 ```sh
