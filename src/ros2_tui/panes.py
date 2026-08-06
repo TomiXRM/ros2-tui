@@ -15,6 +15,7 @@ from .form import flatten_fields
 from .ros import RosBridge, build_message, parse_value
 
 REFRESH_INTERVAL = 3.0
+FILTER_DEBOUNCE = 0.5
 SERVICE_TIMEOUT = 5.0
 
 
@@ -31,6 +32,8 @@ class ListDetailPane(Horizontal):
         self._items: dict[str, object] = {}  # name -> payload (e.g. type string)
         self.selected: tuple[str, object] | None = None
         self._filter = ""
+        self._pending_filter = ""
+        self._filter_timer = None
 
     def compose(self):
         with Vertical(classes="entity-col"):
@@ -77,8 +80,17 @@ class ListDetailPane(Horizontal):
 
     @on(Input.Changed, ".filter")
     def _on_filter_changed(self, event: Input.Changed) -> None:
-        self._filter = event.value.strip()
-        self._render_list()
+        # Debounce: rebuilding the list on every keystroke stalls typing.
+        self._pending_filter = event.value.strip()
+        if self._filter_timer is not None:
+            self._filter_timer.stop()
+        self._filter_timer = self.set_timer(FILTER_DEBOUNCE, self._apply_filter)
+
+    def _apply_filter(self) -> None:
+        self._filter_timer = None
+        if self._pending_filter != self._filter:
+            self._filter = self._pending_filter
+            self._render_list()
 
     @on(Input.Submitted, ".filter")
     def _on_filter_submitted(self) -> None:
