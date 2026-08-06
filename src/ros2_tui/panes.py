@@ -23,6 +23,17 @@ def _oneline(msg) -> str:
     return message_to_yaml(msg).replace("\n", " ").strip()
 
 
+class SafeListView(ListView):
+    """Ignore clicks on items that were removed by a list rebuild in the
+    instant between the click and its handler (auto-refresh race)."""
+
+    def _on_list_item__child_clicked(self, event) -> None:
+        try:
+            super()._on_list_item__child_clicked(event)
+        except ValueError:
+            event.stop()
+
+
 class ListDetailPane(Horizontal):
     """Left: auto-refreshing list of graph entities; right: detail area."""
 
@@ -38,7 +49,7 @@ class ListDetailPane(Horizontal):
     def compose(self):
         with Vertical(classes="entity-col"):
             yield Input(placeholder="/ filter", classes="filter")
-            yield ListView(classes="entity-list")
+            yield SafeListView(classes="entity-list")
         with VerticalScroll(classes="detail"):
             yield Label("Select an item", classes="detail-title")
 
@@ -102,7 +113,7 @@ class ListDetailPane(Horizontal):
     @on(ListView.Selected)
     async def _on_selected(self, event: ListView.Selected) -> None:
         name = event.item.name
-        if name is None:
+        if name is None or name not in self._items:
             return
         self.selected = (name, self._items[name])
         try:
