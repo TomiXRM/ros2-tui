@@ -74,7 +74,10 @@ class ListDetailPane(Horizontal):
         if name is None:
             return
         self.selected = (name, self._items[name])
-        await self.build_detail(name, self._items[name])
+        try:
+            await self.build_detail(name, self._items[name])
+        except Exception as exc:
+            self.log(f"[red]{name}: cannot build detail:[/red] {exc}")
 
     # ── shared helpers ────────────────────────────────────────────────────────
 

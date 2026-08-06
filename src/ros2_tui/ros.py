@@ -11,6 +11,12 @@ from rosidl_runtime_py import set_message_fields
 from rosidl_runtime_py.utilities import get_action, get_message, get_service
 
 
+def _is_hidden(name: str) -> bool:
+    """Hidden ROS names (same rule ros2cli uses): any token starting with '_',
+    e.g. /fibonacci/_action/send_goal."""
+    return any(part.startswith("_") for part in name.split("/"))
+
+
 class RosBridge:
     def __init__(self, session) -> None:
         self.session = session
@@ -26,11 +32,13 @@ class RosBridge:
 
     def list_topics(self) -> list[tuple[str, list[str]]]:
         with self.session.lock() as node:
-            return node.get_topic_names_and_types()
+            topics = node.get_topic_names_and_types()
+        return [t for t in topics if not _is_hidden(t[0])]
 
     def list_services(self) -> list[tuple[str, list[str]]]:
         with self.session.lock() as node:
-            return node.get_service_names_and_types()
+            services = node.get_service_names_and_types()
+        return [s for s in services if not _is_hidden(s[0])]
 
     def list_nodes(self) -> list[str]:
         with self.session.lock() as node:
