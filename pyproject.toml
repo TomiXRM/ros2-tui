@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ros2-tui"
+version = "0.1.0"
+description = "TUI client for ROS 2 actions: form-based send_goal with live feedback"
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+ros2-tui = "ros2_tui.__main__:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-p no:launch_testing -p no:launch_ros"

@@ -1,10 +1,28 @@
 [workspace]
 authors = ["tomixrm <20753105+TomiXRM@users.noreply.github.com>"]
-channels = ["conda-forge"]
+channels = ["https://prefix.dev/robostack-jazzy", "conda-forge"]
 name = "ros2-tui"
-platforms = ["osx-arm64"]
+platforms = ["osx-arm64", "linux-64"]
 version = "0.1.0"
 
 [tasks]
+ros2-tui = "python -m ros2_tui"
+demo-server = "python demo/fibonacci_server.py"
+test = "python -m pytest tests -q"
+
+[activation.env]
+# macOS: default Fast DDS breaks inter-process comms; CycloneDDS works on both OSes
+RMW_IMPLEMENTATION = "rmw_cyclonedds_cpp"
 
 [dependencies]
+python = ">=3.11,<3.13"
+ros-jazzy-ros-base = "*"
+ros-jazzy-example-interfaces = "*"
+ros-jazzy-rmw-cyclonedds-cpp = "*"
+textual = "*"
+pytest = "*"
+pytest-asyncio = "*"
+
+[pypi-dependencies]
+asyncio-for-robotics = { git = "https://github.com/TomiXRM/asyncio-for-robotics.git", branch = "main" }
+ros2-tui = { path = ".", editable = true }
