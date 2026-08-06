@@ -104,7 +104,7 @@ class Ros2TuiApp(App):
                 yield SetParamPane(self.bridge)
             with TabPane("Get Param", id="tab-get-param"):
                 yield GetParamPane(self.bridge)
-        yield RichLog(id="log", markup=True, wrap=True)
+        yield RichLog(id="log", markup=True, wrap=True, max_lines=2000)
         yield Footer()
 
     POLL_INTERVAL = 1.0

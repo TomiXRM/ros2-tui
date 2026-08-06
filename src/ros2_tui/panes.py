@@ -207,13 +207,63 @@ class ActionPane(ListDetailPane):
 
 class TopicPane(ListDetailPane):
     SNAPSHOT_KEY = "topics"
+    ECHO_DISPLAY_HZ = 10.0  # drop display (not data) above this rate
+
+    def __init__(self, bridge: RosBridge, **kwargs) -> None:
+        super().__init__(bridge, **kwargs)
+        self._echoing: str | None = None  # topic currently echoed
 
     async def build_detail(self, name: str, type_str) -> None:
+        self._stop_echo()
         detail = await self.reset_detail(f"[b]{name}[/b]  ({type_str})")
         self.mount_form(detail, get_message(type_str)())
         detail.mount(
-            Horizontal(Button("Publish", id="publish", variant="primary"), classes="buttons")
+            Horizontal(
+                Button("Publish", id="publish", variant="primary"),
+                Button("Echo", id="echo"),
+                classes="buttons",
+            )
         )
+
+    @on(Button.Pressed, "#echo")
+    def _toggle_echo(self) -> None:
+        if self._echoing is not None:
+            self._stop_echo()
+            return
+        if self.selected is None:
+            return
+        name, type_str = self.selected
+        self._echoing = name
+        self.query_one("#echo", Button).label = "Stop Echo"
+        self._echo_worker(name, type_str)
+
+    def _stop_echo(self) -> None:
+        if self._echoing is None:
+            return
+        self._echoing = None
+        self.workers.cancel_group(self, "echo")
+        try:
+            self.query_one("#echo", Button).label = "Echo"
+        except Exception:
+            pass  # detail already torn down
+
+    @work(exclusive=True, group="echo")
+    async def _echo_worker(self, name: str, type_str: str) -> None:
+        import time
+
+        sub = afor.Sub(get_message(type_str), name, session=self.bridge.session)
+        self.log(f"[b]{name}[/b] echo started")
+        last = 0.0
+        try:
+            async for msg in sub.listen():
+                now = time.monotonic()
+                if now - last < 1.0 / self.ECHO_DISPLAY_HZ:
+                    continue
+                last = now
+                self.log(f"[dim]{name}[/dim] {_oneline(msg)}")
+        finally:
+            sub.close()
+            self.log(f"[b]{name}[/b] echo stopped")
 
     @on(Button.Pressed, "#publish")
     def _publish(self) -> None:
