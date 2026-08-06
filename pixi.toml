@@ -1,0 +1,10 @@
+[workspace]
+authors = ["tomixrm <20753105+TomiXRM@users.noreply.github.com>"]
+channels = ["conda-forge"]
+name = "ros2-tui"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
