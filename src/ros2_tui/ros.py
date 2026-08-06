@@ -76,6 +76,21 @@ class RosBridge:
 
     # ── graph queries (blocking; call from a worker thread) ───────────────────
 
+    def snapshot(self) -> dict[str, dict]:
+        """All entity lists in one lock acquisition (lock pauses the executor,
+        so one shared poll beats five competing ones)."""
+        with self.session.lock() as node:
+            actions = get_action_names_and_types(node)
+            topics = node.get_topic_names_and_types()
+            services = node.get_service_names_and_types()
+            node_names = node.get_node_names_and_namespaces()
+        return {
+            "actions": {n: t[0] for n, t in actions},
+            "topics": {n: t[0] for n, t in topics if not _is_hidden(n)},
+            "services": {n: t[0] for n, t in services if not _is_hidden(n)},
+            "nodes": {ns.rstrip("/") + "/" + n: None for n, ns in node_names},
+        }
+
     def list_actions(self) -> list[tuple[str, list[str]]]:
         with self.session.lock() as node:
             return get_action_names_and_types(node)

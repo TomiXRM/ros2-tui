@@ -14,7 +14,6 @@ from textual.widgets import Button, Input, Label, ListItem, ListView, RichLog
 from .form import flatten_fields
 from .ros import RosBridge, build_message, parse_value
 
-REFRESH_INTERVAL = 3.0
 FILTER_DEBOUNCE = 0.5
 SERVICE_TIMEOUT = 5.0
 
@@ -35,7 +34,9 @@ class SafeListView(ListView):
 
 
 class ListDetailPane(Horizontal):
-    """Left: auto-refreshing list of graph entities; right: detail area."""
+    """Left: list of graph entities (fed by the app's poller); right: detail area."""
+
+    SNAPSHOT_KEY = ""  # which slice of RosBridge.snapshot() this pane shows
 
     def __init__(self, bridge: RosBridge, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -53,27 +54,11 @@ class ListDetailPane(Horizontal):
         with VerticalScroll(classes="detail"):
             yield Label("Select an item", classes="detail-title")
 
-    def on_mount(self) -> None:
-        self.refresh_list()
-        self.set_interval(REFRESH_INTERVAL, self.refresh_list)
-
-    # override: blocking graph query -> {name: payload}
-    def fetch(self) -> dict[str, object]:
-        raise NotImplementedError
-
     # override: (re)build the right side for the selected item
     async def build_detail(self, name: str, payload) -> None:
         raise NotImplementedError
 
-    def refresh_list(self) -> None:
-        self._fetch_worker()
-
-    @work(thread=True, exclusive=True)
-    def _fetch_worker(self) -> None:
-        items = self.fetch()
-        self.app.call_from_thread(self._update_list, items)
-
-    def _update_list(self, items: dict[str, object]) -> None:
+    def receive_items(self, items: dict[str, object]) -> None:
         if items == self._items:
             return
         self._items = items
@@ -159,8 +144,7 @@ class ActionPane(ListDetailPane):
         super().__init__(bridge, **kwargs)
         self._goal_handle = None
 
-    def fetch(self):
-        return {name: types[0] for name, types in self.bridge.list_actions()}
+    SNAPSHOT_KEY = "actions"
 
     async def build_detail(self, name: str, type_str) -> None:
         detail = await self.reset_detail(f"[b]{name}[/b]  ({type_str})")
@@ -222,8 +206,7 @@ class ActionPane(ListDetailPane):
 
 
 class TopicPane(ListDetailPane):
-    def fetch(self):
-        return {name: types[0] for name, types in self.bridge.list_topics()}
+    SNAPSHOT_KEY = "topics"
 
     async def build_detail(self, name: str, type_str) -> None:
         detail = await self.reset_detail(f"[b]{name}[/b]  ({type_str})")
@@ -254,8 +237,7 @@ class TopicPane(ListDetailPane):
 
 
 class ServicePane(ListDetailPane):
-    def fetch(self):
-        return {name: types[0] for name, types in self.bridge.list_services()}
+    SNAPSHOT_KEY = "services"
 
     async def build_detail(self, name: str, type_str) -> None:
         detail = await self.reset_detail(f"[b]{name}[/b]  ({type_str})")
@@ -294,8 +276,7 @@ class ServicePane(ListDetailPane):
 class GetParamPane(ListDetailPane):
     """Node list → read-only parameter dump."""
 
-    def fetch(self):
-        return {name: None for name in self.bridge.list_nodes()}
+    SNAPSHOT_KEY = "nodes"
 
     async def build_detail(self, name: str, _payload) -> None:
         detail = await self.reset_detail(f"[b]{name}[/b] parameters")
@@ -324,8 +305,7 @@ class SetParamPane(ListDetailPane):
         super().__init__(bridge, **kwargs)
         self._snapshot: dict[str, object] = {}
 
-    def fetch(self):
-        return {name: None for name in self.bridge.list_nodes()}
+    SNAPSHOT_KEY = "nodes"
 
     async def build_detail(self, name: str, _payload) -> None:
         detail = await self.reset_detail(f"[b]{name}[/b] parameters")

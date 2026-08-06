@@ -107,9 +107,26 @@ class Ros2TuiApp(App):
         yield RichLog(id="log", markup=True, wrap=True)
         yield Footer()
 
+    POLL_INTERVAL = 1.0
+
     def on_mount(self) -> None:
         self.theme = "rose-pine"
         self._update_status()
+        self._poll()
+        self.set_interval(self.POLL_INTERVAL, self._poll)
+
+    @work(thread=True, exclusive=True, group="poll")
+    def _poll(self) -> None:
+        """Single background poller: one lock acquisition for all lists."""
+        try:
+            snapshot = self.bridge.snapshot()
+        except Exception:
+            return  # session is restarting (domain switch) — next tick will catch up
+        self.call_from_thread(self._distribute, snapshot)
+
+    def _distribute(self, snapshot: dict) -> None:
+        for pane in self.query(ListDetailPane):
+            pane.receive_items(snapshot[pane.SNAPSHOT_KEY])
 
     def _update_status(self) -> None:
         import os
@@ -120,9 +137,7 @@ class Ros2TuiApp(App):
         )
 
     def action_refresh(self) -> None:
-        active = self._active_list_pane()
-        if active is not None:
-            active.refresh_list()
+        self._poll()
 
     def action_focus_filter(self) -> None:
         active = self._active_list_pane()
@@ -171,5 +186,4 @@ class Ros2TuiApp(App):
         self.query_one("#log", RichLog).write(
             f"[green]connected to ROS domain {self.bridge.domain_id}[/green]"
         )
-        for pane in self.query(ListDetailPane):
-            pane.refresh_list()
+        self._poll()
